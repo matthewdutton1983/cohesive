@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cohesive"
-version = "0.1.3"
+version = "0.1.4"
 description = "Lightweight Python library that uses sentence embeddings to create naturally coherent segments of text akin to paragraphs."
 readme = "README.md"
 authors = ["Matthew Dutton <matthewdutton1983@hotmail.co.uk>"]
