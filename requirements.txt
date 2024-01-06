@@ -1,4 +1,0 @@
-networkx
-numpy
-python-louvain
-sentence-transformers
