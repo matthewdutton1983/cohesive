@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cohesive"
+version = "0.1"
+description = "Lightweight Python library that uses sentences embeddings to create naturally coherent segments of text akin to paragraphs."
+readme = "README.md"
+authors = [
+  { name="Matthew Dutton", email="matthewdutton1983@hotmail.co.uk" },
+]
+license = { file = "LICENSE.txt" }
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+  "networkx",
+  "numpy",
+  "python-louvain",
+  "sentence-transformers"
+]
