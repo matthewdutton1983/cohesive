@@ -16,13 +16,13 @@ RESOLUTION: float = 1.0
 
 
 class CohesiveTextSegmenter:
-    def __init__(self, model_name_or_path: str = "paraphrase-MiniLM-L6-v2"):
+    def __init__(self, model_name_or_path: str = "paraphrase-MiniLM-L6-v2", **kwargs):
         """Initializes the CohesiveTextSegmenter.
 
         Args:
             model_name_or_path: Path to the sentence transformer model.
         """
-        self.model = self._load_model(model_name_or_path)
+        self.model = self._load_model(model_name_or_path, **kwargs)
         self.alpha: float = ALPHA
         self.context_window: int = CONTEXT_WINDOW
         self.decay: float = DECAY
@@ -30,11 +30,12 @@ class CohesiveTextSegmenter:
         self.segments: list[tuple[int, list[tuple[int, str]]]] = None
 
 
-    def _load_model(self, model_name_or_path: str) -> SentenceTransformer:
+    def _load_model(self, model_name_or_path: str, **kwargs) -> SentenceTransformer:
         """Loads the model from the specified path.
 
         Args:
             model_name_or_path: Path to the sentence transformer model.
+            **kwargs: Additional keyword arguments to pass to the SentenceTransformer constructor.
 
         Returns:
             The loaded SentenceTransformer model.
@@ -43,7 +44,7 @@ class CohesiveTextSegmenter:
             ValueError: If there's an error loading the model.
         """
         try:  
-          return SentenceTransformer(model_name_or_path)
+          return SentenceTransformer(model_name_or_path, **kwargs)
         except Exception as e:
             raise ValueError(f"Error loading the model: {e}")
             
