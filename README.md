@@ -12,15 +12,41 @@ pip install cohesive
 
 ## Using cohesive
 
-To start using the SDK, simply import the CohesiveTextSegmenter and create a new instance:
+To start using cohesive, import the CohesiveTextSegmenter and create a new instance:
 
 ```python
 from cohesive import CohesiveTextSegmenter
 
-# Instantiate the CohesiveTextSegmenter with the model that you want to use.
-# By default, cohesive utilizes paraphrase-MiniLM-L6-v2, which has produced good results.
+# By default, cohesive uses paraphrase-MiniLM-L6-v2, which produces good
+# results, but you can specify any SentenceTransformer model.
+# For example, lets use all-MiniLM-L6-v2 ...
 cohesive = CohesiveTextSegmenter("all-MiniLM-L6-v2")
 
 # Then, all you need to do is call the generate_tiles method and pass in an array of sentences.
 cohesive.generate_segments(sentences)
 ```
+
+## Finetuning cohesive
+
+cohesive users can finetune several parameters, which all impact the final segmentation results in different ways. Here is a quick summary:
+
+- **Alpha**:
+
+  - **Role**: Used as a weight in combining global and local similarities.
+  - **Impact**: A higher alpha places more emphasis on global similarities, making the segmentation more influenced by overall similarity between sentences. Conversely, a lower alpha gives more weight to local similarities within the context window.
+  - **Default**:
+
+- **Context Window**:
+
+  - **Role**: Determines the size of the context window used to calculate local similarities between sentences.
+  - **Impact**: A smaller context window focuses on very close neighbors, capturing fine-grained local relationships. This may be suitable for documents where coherence is established within a small span of sentences. On the other hand, a larger context window considers a broader context, capturing longer-range dependencies and global patterns.
+  - **Default**:
+
+- **Decay**:
+  - **Role**: Used to calculate decay factors based on distances between sentence indices when combining similarities.
+  - **Impact**: A higher decay results in faster decay with increasing distance between sentences. This means that sentences further apart contribute less to the overall similarity, emphasizing local cohesion. A lower decay allows for longer-range dependencies to impact the segmentation.
+  - **Default**:
+- **Resolution**:
+  - **Role**: Used in the community detection algorithm.
+  - **Impact**: A higher resolution value leads to more and smaller communities, potentially yielding finer-grained segmentation. Conversely, a lower resolution results in fewer and larger communities, offering a more consolidated segmentation.
+  - **Default**:
