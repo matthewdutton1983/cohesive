@@ -76,3 +76,7 @@ When **create_segments** has finished, cohesive will print a summary of the tota
 To view the segments, simply call the **print_segments** method.
 
 You can also view the start and end indices of sentences with a segment via the **print_segment_boundaries** function.
+
+## References
+
+cohesive is inspired by an article written by Massimiliano Costacurta, published in Towards Data Science in June 2023: [Text Tiling Done Right: Building Solid Foundations for your Personal LLM](https://towardsdatascience.com/text-tiling-done-right-building-solid-foundations-for-your-personal-llm-e70947779ac1). The source code for this article can be accessed [here](https://github.com/massi82/texttiling/tree/master).
