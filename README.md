@@ -4,7 +4,7 @@ cohesive is a lightweight segmenter that uses sentence embeddings to split docum
 
 ## Installation
 
-You can install 'cohesive' using pip:
+You can install cohesive using pip:
 
 ```bash
 pip install cohesive
