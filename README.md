@@ -17,7 +17,7 @@ To start using the SDK, simply import the CohesiveTextSegmenter and create a new
 ```python
 from cohesive import CohesiveTextSegmenter
 
-# Create a new instance of semantify by passing in the name of the SentenceTransformer model that you want to use to generate the chunks.
+# Instantiate the CohesiveTextSegmenter with the model that you want to use.
 # By default, cohesive utilizes paraphrase-MiniLM-L6-v2, which has produced good results.
 cohesive = CohesiveTextSegmenter("all-MiniLM-L6-v2")
 
