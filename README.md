@@ -22,7 +22,8 @@ from cohesive import CohesiveTextSegmenter
 # For example, lets use all-MiniLM-L6-v2 ...
 cohesive = CohesiveTextSegmenter("all-MiniLM-L6-v2")
 
-# Then, all you need to do is call the generate_tiles method and pass in an array of sentences.
+# Then, all you need to do is call the generate_tiles method and pass
+# in an array of sentences.
 cohesive.generate_segments(sentences)
 ```
 
