@@ -1,4 +1,4 @@
-#$# Import standard libraries
+# Import standard libraries
 import re
 import unicodedata
 from collections import defaultdict
