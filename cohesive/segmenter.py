@@ -1,4 +1,5 @@
-#$# Import standard libraries
+# Import standard libraries
+import math
 import re
 import unicodedata
 from collections import defaultdict
@@ -6,308 +7,192 @@ from collections import defaultdict
 # Import third-party libraries
 import community as community_louvain
 import networkx as nx
-import numpy as np
-from sentence_transformers import SentenceTransformer
+from scipy.spatial.distance import cosine
 
-ALPHA: float = 0.5
-CONTEXT_WINDOW: int = 6
-DECAY: float = 0.8
-RESOLUTION: float = 1.0  
+# Import project code
+from cohesive.segment import Segment
+from cohesive.encoder import SentenceTransformersEncoder
 
 
-class CohesiveTextSegmenter:
-    def __init__(self, model_name_or_path: str = "paraphrase-MiniLM-L6-v2", **kwargs):
-        """Initializes the CohesiveTextSegmenter.
-
-        Args:
-            model_name_or_path: Path to the sentence transformer model.
-        """
-        self.model = self._load_model(model_name_or_path, **kwargs)
-        self.alpha: float = ALPHA
-        self.context_window: int = CONTEXT_WINDOW
-        self.decay: float = DECAY
-        self.resolution: float = RESOLUTION
-        self.segments: list[tuple[int, list[tuple[int, str]]]] = None
+class Cohesive:
+    def __init__(self, model_name_or_path="paraphrase-MiniLM-L6-v2"):
+        self.encoder = SentenceTransformersEncoder(model_name_or_path=model_name_or_path)
+        self.segments = []
 
 
-    def _load_model(self, model_name_or_path: str, **kwargs) -> SentenceTransformer:
-        """Loads the model from the specified path.
-
-        Args:
-            model_name_or_path: Path to the sentence transformer model.
-            **kwargs: Additional keyword arguments to pass to the SentenceTransformer constructor.
-
-        Returns:
-            The loaded SentenceTransformer model.
-
-        Raises:
-            ValueError: If there's an error loading the model.
-        """
-        try:  
-          return SentenceTransformer(model_name_or_path, **kwargs)
-        except Exception as e:
-            raise ValueError(f"Error loading the model: {e}")
-            
-
-    def _generate_embeddings(self, sentences: list[str]) -> np.ndarray:
-        """Generates embeddings for the a list of text chunks.
-
-        Args:
-            sentences: A list of sentences to embed.
-
-        Returns:
-            A NumPy array of sentence embeddings.
-        """    
-        return self.model.encode(sentences, show_progress_bar=True)
-            
+    def get_similarity_scores(self, embeddings_a, embeddings_b):
+        return [1 - cosine(a, b) for a, b in zip(embeddings_a, embeddings_b)]
         
-    def _normalize_similarities(self, similarity_matrix: np.ndarray, embeddings: np.ndarray) -> np.ndarray:
-        """Normalizes the similarity scores for cosine similarity.
 
-        Args:
-            similarity_matrix: The similarity matrix to normalize.
-            embeddings: The embeddings used to compute the similarity matrix.
-
-        Returns:
-            The normalized similarity matrix.
-        """
-        return similarity_matrix / np.linalg.norm(embeddings, axis=1)[:, np.newaxis]
-
-
-    def _create_similarity_matrix(self, embeddings: np.ndarray) -> np.ndarray:
-        """Creates a similarity matrix for all embeddings.
-
-        Args:
-            embeddings: A NumPy array of sentence embeddings.
-
-        Returns:
-            A NumPy array representing the similarity matrix.
-        """
-        similarity_matrix = np.dot(embeddings, embeddings.T)
-        return self._normalize_similarities(similarity_matrix, embeddings)
-
-
-    def _calculate_local_similarities(self, sentences: list[str], similarity_matrix: np.ndarray) -> np.ndarray:
-        """Calculates a similarity matrix for all embeddings within the context window.
-
-        Args:
-            sentences: A list of sentences.
-            similarity_matrix: The global similarity matrix.
-
-        Returns:
-            A NumPy array representing the local similarity matrix.
-        """
-        local_similarities = np.zeros((len(sentences), len(sentences)))
-
-        for i in range(len(sentences)):
-            start = max(0, i - self.context_window)
-            end = min(len(sentences), i + self.context_window + 1)
-
-            local_similarities[i, start:end] = similarity_matrix[i, start:end]
+    def calculate_window_indices(self, i, window_size, num_sentences, balanced_window):
+        start = max(0, i - (window_size // 2)) if balanced_window else i + 1
+        end = min(i + 1 + (window_size // 2), num_sentences) if balanced_window else i + 1 + window_size
         
-        return local_similarities
+        return start, end
 
 
-    def _calculate_combined_similarities(
-            self, 
-            sentences: list[str], 
-            similarity_matrix: np.ndarray, 
-            local_similarities: np.ndarray
-        ) -> np.ndarray:
-        """Combines global and local similarities via a weighted average."""
-        combined_similarities = self.alpha * similarity_matrix + (1 - self.alpha) * local_similarities
+    def generate_sentence_couples(self, num_sentences, window_size, balanced_window):
+        couples = []
 
-        indices = np.triu_indices(len(sentences), k=1)
-        distances = np.abs(indices[0] - indices[1])
-        decay_factors = np.exp(-self.decay * distances)
+        for i in range(num_sentences):
+            start, end = self.calculate_window_indices(i, window_size, num_sentences, balanced_window)
+            couples.extend([i, j] for j in range(start, end))
 
-        combined_similarities[indices] *= decay_factors
-        combined_similarities[indices[::-1]] *= decay_factors
+        return couples
+
+
+    def calculate_distance_matrix(self, num_sentences, window_size, balanced_window):
+        results = []
+        couples = self.generate_sentence_couples(num_sentences, window_size, balanced_window)
+
+        for i, j in couples:
+            results.append([i, j, math.exp(-abs(j - i) / 2)])
+    
+        return results, couples
+    
+
+    def extract_embeddings_for_couples(self, couples, embeddings):
+        a, b = zip(*couples)
+
+        embeddings_a = [embeddings[i] for i in a]
+        embeddings_b = [embeddings[i] for i in b]
+
+        return embeddings_a, embeddings_b
+
+
+    def update_similarity_scores(self, results, similarities, exponential_scaling):
+        for i, s in enumerate(similarities):
+            results[i][2] *= (s**2) if exponential_scaling else s
+
+        return results
+    
+
+    def create_similarity_graph(self, sentences, embeddings, window_size, balanced_window, exponential_scaling):
+        num_sentences = len(sentences)
         
-        return combined_similarities
+        results, couples = self.calculate_distance_matrix(num_sentences, window_size, balanced_window)
+        embeddings_a, embeddings_b = self.extract_embeddings_for_couples(couples, embeddings)
+        similarities = self.get_similarity_scores(embeddings_a, embeddings_b)
+        similarity_graph = self.update_similarity_scores(results, similarities, exponential_scaling)
+        
+        return similarity_graph
+    
+
+    def create_nx_graph(self, graph):
+        G = nx.Graph()
+
+        for node in graph:
+            G.add_edge(node[0], node[1], weight=node[2])
+
+        return G
 
 
-    def _create_nx_graph(self, combined_similarities: np.ndarray) -> nx.Graph:
-        """Builds a NetworkX graph from the combined similarities.
+    def find_best_partition(self, nx_graph, resolution):
+        return community_louvain.best_partition(nx_graph, resolution=resolution, weight="weight", randomize=False)
+                        
 
-        Args:
-            combined_similarities: A NumPy array representing the combined similarity matrix.
+    def find_overlap(self, vector1, vector2):
+        if not vector1 or not vector2:
+            return [], 0, 0
+        
+        min_v1, max_v1 = min(vector1), max(vector1)
+        min_v2, max_v2 = min(vector2), max(vector2)
 
-        Returns:
-            A NetworkX graph representing the sentence relationships.
-        """
-        return nx.from_numpy_array(combined_similarities)
+        one_in_two = [num for num in vector1 if min_v2 <= num <= max_v2]
+        two_in_one = [num for num in vector2 if min_v1 <= num <= max_v1]
+        
+        overlap = one_in_two + two_in_one
+        
+        return overlap, len(one_in_two), len(two_in_one)
 
-    def _find_best_partition(self, nx_graph: nx.Graph) -> dict[int, int]:
-        """Finds community partitions in a NetworkX graph.
 
-        Args:
-            nx_graph: The NetworkX graph to analyze.
-
-        Returns:
-            A dictionary mapping nodes to their assigned community.
-        """
-        return community_louvain.best_partition(nx_graph, resolution=self.resolution, weight="weight", randomize=False)
-
-    def _merge_clusters(self, clusters: list[np.ndarray]) -> list[np.ndarray]:
-        """Iteratively merges overlapping clusters.
-
-        Args:
-            clusters: A list of NumPy arrays representing clusters.
-
-        Returns:
-            A list of merged clusters represented by NumPy arrays.
-        """
-        merged_clusters = []
-
+    def compact_clusters(self, clusters):
+        compact_clusters = []
+        
         while clusters:
-            current_cluster = clusters.pop(0)
+            curr_cl = clusters.pop(0)
+            
+            for target_cl in clusters[:]:
+                overlap, n_1_in_2, n_2_in_1 = self.find_overlap(target_cl, curr_cl)
+            
+                if overlap:
+                    if n_1_in_2 < n_2_in_1 or n_2_in_1 == 0:
+                        curr_cl.extend(overlap)
+                        curr_cl = list(set(curr_cl))
+                        target_cl = list(set(target_cl) - set(overlap))
+                    else:
+                        target_cl.extend(overlap)
+                        target_cl = list(set(target_cl))
+                        curr_cl = list(set(curr_cl) - set(overlap))
+                    
+                    if not curr_cl:
+                        break
+                        
+            if curr_cl:
+                compact_clusters.append(sorted(set(curr_cl)))
+                        
+        compact_clusters.sort()
 
-            for next_cluster in clusters:
-                if np.any(np.isin(current_cluster, next_cluster)):
-                    current_cluster = np.union1d(current_cluster, next_cluster)
-                    clusters.remove(next_cluster)
-                    break
+        return compact_clusters
 
-            merged_clusters.append(current_cluster)
 
-        return merged_clusters
+    def convert_partition_to_segments(self, partition):
+        raw_segments = defaultdict(list)
 
-    def _group_nodes_into_segments(self, partition: dict[int, int]) -> list[list[int]]:
-        """Groups nodes into segments based on community detection.
+        for k, v in partition.items():
+            raw_segments[v].append(k)
 
-        Args:
-            partition: A dictionary mapping nodes to their assigned community.
+        segment_indices = self.compact_clusters(list(raw_segments.values()))
 
-        Returns:
-            A list of lists containing the indices of nodes within each segment.
-        """
-        segments = defaultdict(list)
+        return segment_indices
+    
 
-        for node, community in partition.items():
-            segments[community].append(node)
-
-        sorted_segments = [sorted(seg) for seg in segments.values()]
-        merged_clusters = self._merge_clusters(sorted_segments)
-
-        return merged_clusters
-
-    def _extract_segment_boundaries(self, segment: list[tuple[int, str]]) -> tuple[int, int]:
-        """Extracts the start and end indices of sentences in a segment.
-
-        Args:
-            segment: A list of tuples containing sentence indices and texts.
-
-        Returns:
-            A tuple representing the start and end indices of the segment.
-        """
-        start_index = segment[1][0][0]
-        end_index = segment[1][-1][0]
-
-        return start_index, end_index
-
-    def _clean_text(self, text: str) -> str:
-        """Removes unicode characters and duplicate whitespace.
-
-        Args:
-            text: The text to clean.
-
-        Returns:
-            The cleaned text.
-        """
+    def clean_text(self, text):
         cleaned_text = "".join(" " if unicodedata.category(char)[0] == "C" else char for char in text)
         cleaned_text = re.sub(r"\s+", " ", cleaned_text)
 
         return cleaned_text.strip()
 
-    def _update_parameters(self, **kwargs):
-        """Updates the specified parameters.
 
-        Args:
-            **kwargs: Keyword arguments containing valid parameter names and values.
-
-        Raises:
-            ValueError: If an invalid parameter is specified.
-        """
-        valid_params = {"alpha", "context_window", "decay", "resolution"}
-
-        for key, value in kwargs.items():
-            if key in valid_params:
-                setattr(self, key, value)
-            else:
-                raise ValueError("Invalid parameter specfied. Choose from: {}".format(valid_params))
+    def is_sequential(self, segments):
+        for segment in segments:
+            if not all(segment[i] == segment[i - 1] + 1 for i in range(1, len(segment))):
+                return False
+        
+        return True
     
 
-    def create_segments(self, sentences: list[str], **kwargs) -> str:
-        """Creates naturally coherent segments by grouping semantically similar sentences.
+    def extract_segment_boundaries(self, segment):
+        start = segment.sentences[0][0]
+        end = segment.sentences[-1][0]
 
-        Args:
-            sentences: A list of sentences to segment.
-            **kwargs: Keyword arguments to update specific parameters.
+        return start, end
 
-        Returns:
-            A string indicating the number of generated segments.
 
-        Raises:
-            ValueError: If the input sentence list is empty.
-        """
-        if not sentences:
-            raise ValueError("Input sentences list is empty.")
-        
-        self._update_parameters(**kwargs)
-        
-        embeddings = self._generate_embeddings(sentences)
+    def create_segments(self, sentences, window_size=4, resolution=1.5, show_progress_bar=False, balanced_window=True, exponential_scaling=True
+        ):
+        embeddings = self.encoder.generate_embeddings(sentences, show_progress_bar)
+        similarity_graph = self.create_similarity_graph(sentences, embeddings, window_size, balanced_window, exponential_scaling)
+        nx_graph = self.create_nx_graph(similarity_graph)
+        partition = self.find_best_partition(nx_graph, resolution)
+        segment_indices = self.convert_partition_to_segments(partition)
 
-        if len(sentences) != len(embeddings):
-            raise ValueError("The number of sentences and embeddings does not match.")
+        self.segments = [
+            Segment(idx, [(sent_idx, sentences[sent_idx]) for sent_idx in sorted(seg)]) for idx, seg in enumerate(segment_indices)
+        ]
 
-        similarity_matrix = self._create_similarity_matrix(embeddings)
-        local_similarities = self._calculate_local_similarities(sentences, similarity_matrix)
-        combined_similarities = self._calculate_combined_similarities(sentences, similarity_matrix, local_similarities)
-        nx_graph = self._create_nx_graph(combined_similarities)
-        partition = self._find_best_partition(nx_graph)
-        segment_indices = self._group_nodes_into_segments(partition)
-    
-        self.segments = [(idx, [(sent_idx, sentences[sent_idx]) for sent_idx in seg]) for idx, seg in enumerate(segment_indices)]
+        if not self.is_sequential(segment_indices):
+            print("Sentence order not preserved.")
 
         return f"Generated {len(self.segments)} segments."
 
 
-    def print_segments(self) -> None:
-        """Prints the contents of each segment to the console."""
-        for _, sentences in self.segments:
-            joined_sentences = " ".join(self._clean_text(sent) for _, sent in sentences)
-            print(joined_sentences + "\n")
-
-    
-    def print_segment_boundaries(self) -> None:
-        """Prints the start and end indices of sentences within a segment."""
+    def get_segment_contents(self):       
         for segment in self.segments:
-            print(self._extract_segment_boundaries(segment))
+            segment_contents = " ".join(self.clean_text(sent) for _, sent in segment.sentences)
+            print(segment_contents + "\n")
             
 
-    def get_params(self) -> dict[str, float]:
-        """Displays a summary of the current parameter values.
-
-        Returns:
-          A dictionary containing parameter names and their current values.
-        """
-        return {
-            "alpha": self.alpha,
-            "context_window": self.context_window,
-            "decay": self.decay,
-            "resolution": self.resolution
-        }
-
-    
-    def finetune_params(self, **kwargs) -> None:
-        """Allows the user to dynamically change the parameters as needed.
-
-        Args:
-            **kwargs: Keyword arguments containing valid parameter names and values.
-
-        Raises:
-            ValueError: If an invalid parameter is specified.
-        """
-        return self._update_parameters(**kwargs)
+    def get_segment_boundaries(self):
+        return [self.extract_segment_boundaries(segment) for segment in self.segments]
     

@@ -12,22 +12,23 @@ pip install cohesive
 
 ## Using cohesive
 
-To start using cohesive, import the CohesiveTextSegmenter and create a new instance:
+To start using cohesive, import Cohesive and the relevant text embedding class. Choose from OpenAI, SentenceTransformers, Tensorflow, or Transformers:
 
 ```python
-from cohesive import CohesiveTextSegmenter
+from cohesive import Cohesive
+from cohesive.embeddings import SentenceTransformersEmbeddings
 
-# By default, cohesive uses paraphrase-MiniLM-L6-v2, which produces good
-# results, but you can specify any SentenceTransformer model.
-# For example, lets use all-MiniLM-L6-v2 ...
-cohesive = CohesiveTextSegmenter("all-MiniLM-L6-v2")
+# Instantiate your embedding of choice and pass it into the Cohesive constructor.
+# Each embedding class is configured to run a default model.
+# For example, SentenceTransformersEmbeddings runs all-Mini-LM-L6-v2 out of the box.
+# But you can pass the name of any model into the embeddings constructor.
+embeddings = SentenceTransformersEmbeddings("msmarco-distilbert-cos-v5")
+cohesive = Cohesive(embedding)
 
-# Then, all you need to do is call the generate_tiles method and pass
+# Then, all you need to do is call the create_segments method and pass
 # in an array of sentences.
-cohesive.generate_segments(sentences)
+cohesive.create_segments(sentences)
 ```
-
-cohesive currently supports all SentenceTransformer models. Different models will be added in the future.
 
 ## Finetuning cohesive
 
@@ -38,12 +39,6 @@ cohesive users can finetune several parameters, which all impact the final segme
   - **Role**: Used as a weight in combining global and local similarities.
   - **Impact**: A higher alpha places more emphasis on global similarities, making the segmentation more influenced by overall similarity between sentences. Conversely, a lower alpha gives more weight to local similarities within the context window.
   - **Default**: 0.5
-
-- **Context Window**:
-
-  - **Role**: Determines the size of the context window used to calculate local similarities between sentences.
-  - **Impact**: A smaller context window focuses on very close neighbors, capturing fine-grained local relationships. This may be suitable for documents where coherence is established within a small span of sentences. On the other hand, a larger context window considers a broader context, capturing longer-range dependencies and global patterns.
-  - **Default**: 6
 
 - **Decay**:
 
@@ -57,11 +52,23 @@ cohesive users can finetune several parameters, which all impact the final segme
   - **Impact**: A higher resolution value leads to more and smaller communities, potentially yielding finer-grained segmentation. Conversely, a lower resolution results in fewer and larger communities, offering a more consolidated segmentation.
   - **Default**: 1.0
 
+- **Window Direction**:
+
+  - **Role**: Controls the directionality of the context window when calculating local similarities.
+  - **Impact**: Determines whether the context window is symmetrical or asymmetrical, focusing on preceeding or subsequent sentences, or both.
+  - **Default**: "bidirectional"
+
+- **Window Size**:
+
+  - **Role**: Determines the size of the context window used to calculate local similarities between sentences.
+  - **Impact**: A smaller context window focuses on very close neighbors, capturing fine-grained local relationships. This may be suitable for documents where coherence is established within a small span of sentences. On the other hand, a larger context window considers a broader context, capturing longer-range dependencies and global patterns.
+  - **Default**: 6
+
 To modify the parameters, either pass in the appropriate parameter name and value when you call the create_segments method, or use the dedicated finetune_params function:
 
 ```python
 # Via create_segments
-cohesive.create_segments(sentences, context_window=3)
+cohesive.create_segments(sentences, window_size=3)
 
 # Via finetune_params
 cohesive.finetune_params(alpha=1, decay=0.2)

@@ -1,7 +1,8 @@
 [tool.poetry]
 name = "cohesive"
 version = "0.1.4"
-description = "Lightweight Python library that uses sentence embeddings to create naturally coherent segments of text akin to paragraphs."
+description = "Use sentence embeddings to create naturally coherent segments of text akin to paragraphs."
+url = "https://github.com/matthewdutton1983/cohesive"
 readme = "README.md"
 authors = ["Matthew Dutton <matthewdutton1983@hotmail.co.uk>"]
 license = "Apache-2.0"
@@ -10,8 +11,12 @@ license = "Apache-2.0"
 python = "^3.8"
 networkx = "^2.6.3"
 numpy = "^1.21.2"
+openai = 
 python-louvain = "^0.15"
 sentence-transformers = "^2.1.0"
+torch
+tensorflow
+tensorflow-hub
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
