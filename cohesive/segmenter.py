@@ -8,6 +8,7 @@ from collections import defaultdict
 import community as community_louvain
 import networkx as nx
 from scipy.spatial.distance import cosine
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Import project code
 from cohesive.segment import Segment
@@ -20,8 +21,13 @@ class Cohesive:
         self.segments = []
 
 
-    def get_similarity_scores(self, embeddings_a, embeddings_b):
-        return [1 - cosine(a, b) for a, b in zip(embeddings_a, embeddings_b)]
+    def get_similarity_scores(self, embeddings_a, embeddings_b, framework="scipy"):
+        if framework == "scipy":
+            return [1 - cosine(a, b) for a, b in zip(embeddings_a, embeddings_b)]
+        elif framework == "sklearn":
+            embeddings_a = [self.encoder.reshape_embedding(a) for a in embeddings_a]
+            embeddings_b = [self.encoder.reshape_embedding(b) for b in embeddings_b]
+            return [1 - cosine_similarity(a, b) for a, b in zip(embeddings_a, embeddings_b)]
         
 
     def calculate_window_indices(self, i, window_size, num_sentences, balanced_window):
@@ -36,6 +42,8 @@ class Cohesive:
 
         for i in range(num_sentences):
             start, end = self.calculate_window_indices(i, window_size, num_sentences, balanced_window)
+            end = min(end, num_sentences)
+    
             couples.extend([i, j] for j in range(start, end))
 
         return couples
@@ -67,12 +75,19 @@ class Cohesive:
         return results
     
 
-    def create_similarity_graph(self, sentences, embeddings, window_size, balanced_window, exponential_scaling):
+    def create_similarity_graph(
+            self, 
+            sentences, 
+            embeddings, 
+            window_size, 
+            framework, 
+            balanced_window, 
+            exponential_scaling
+        ):
         num_sentences = len(sentences)
-        
         results, couples = self.calculate_distance_matrix(num_sentences, window_size, balanced_window)
         embeddings_a, embeddings_b = self.extract_embeddings_for_couples(couples, embeddings)
-        similarities = self.get_similarity_scores(embeddings_a, embeddings_b)
+        similarities = self.get_similarity_scores(embeddings_a, embeddings_b, framework)
         similarity_graph = self.update_similarity_scores(results, similarities, exponential_scaling)
         
         return similarity_graph
@@ -87,8 +102,14 @@ class Cohesive:
         return G
 
 
-    def find_best_partition(self, nx_graph, resolution):
-        return community_louvain.best_partition(nx_graph, resolution=resolution, weight="weight", randomize=False)
+    def find_best_partition(self, nx_graph, louvain_resolution):
+        return community_louvain.best_partition(
+            nx_graph, 
+            resolution=louvain_resolution, 
+            weight="weight", 
+            randomize=False, 
+            random_state=256
+        )
                         
 
     def find_overlap(self, vector1, vector2):
@@ -167,19 +188,50 @@ class Cohesive:
         end = segment.sentences[-1][0]
 
         return start, end
+         
 
-
-    def create_segments(self, sentences, window_size=4, resolution=1.5, show_progress_bar=False, balanced_window=True, exponential_scaling=True
+    def create_segments(
+            self, 
+            sentences, 
+            window_size=4, 
+            louvain_resolution=1.,
+            framework="scipy",
+            show_progress_bar=False, 
+            balanced_window=False, 
+            exponential_scaling=False,
+            max_sentences_per_segment=None
         ):
         embeddings = self.encoder.generate_embeddings(sentences, show_progress_bar)
-        similarity_graph = self.create_similarity_graph(sentences, embeddings, window_size, balanced_window, exponential_scaling)
+        
+        similarity_graph = self.create_similarity_graph(
+            sentences, 
+            embeddings, 
+            window_size, 
+            framework, 
+            balanced_window, 
+            exponential_scaling
+        )
+                
         nx_graph = self.create_nx_graph(similarity_graph)
-        partition = self.find_best_partition(nx_graph, resolution)
+        partition = self.find_best_partition(nx_graph, louvain_resolution)
         segment_indices = self.convert_partition_to_segments(partition)
 
-        self.segments = [
-            Segment(idx, [(sent_idx, sentences[sent_idx]) for sent_idx in sorted(seg)]) for idx, seg in enumerate(segment_indices)
-        ]
+        current_segment_index = 0
+
+        for idx, seg in enumerate(segment_indices):
+            if max_sentences_per_segment is not None and len(seg) > max_sentences_per_segment:
+                sub_segments = [seg[i:i + max_sentences_per_segment] for i in range(0, len(seg), max_sentences_per_segment)]
+                
+                for sub_idx, sub_seg in enumerate(sub_segments):
+                    self.segments.append(
+                        Segment(current_segment_index, [(sent_idx, sentences[sent_idx]) for sent_idx in sorted(sub_seg)])
+                    )
+                    current_segment_index += 1
+            else:
+                self.segments.append(
+                    Segment(current_segment_index, [(sent_idx, sentences[sent_idx]) for sent_idx in sorted(seg)])
+                )
+                current_segment_index += 1
 
         if not self.is_sequential(segment_indices):
             print("Sentence order not preserved.")
@@ -188,9 +240,11 @@ class Cohesive:
 
 
     def get_segment_contents(self):       
-        for segment in self.segments:
-            segment_contents = " ".join(self.clean_text(sent) for _, sent in segment.sentences)
-            print(segment_contents + "\n")
+        segment_contents = [
+            " ".join(self.clean_text(sent) for _, sent in segment.sentences)
+            for segment in self.segments
+        ]
+        return segment_contents
             
 
     def get_segment_boundaries(self):
