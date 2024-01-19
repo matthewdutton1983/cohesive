@@ -201,28 +201,20 @@ class Cohesive:
             exponential_scaling=False,
             max_sentences_per_segment=None
         ):
+        self.segments = []
+
         embeddings = self.encoder.generate_embeddings(sentences, show_progress_bar)
-        
-        similarity_graph = self.create_similarity_graph(
-            sentences, 
-            embeddings, 
-            window_size, 
-            framework, 
-            balanced_window, 
-            exponential_scaling
-        )
-                
+        similarity_graph = self.create_similarity_graph(sentences, embeddings, window_size, framework, balanced_window, exponential_scaling)
         nx_graph = self.create_nx_graph(similarity_graph)
         partition = self.find_best_partition(nx_graph, louvain_resolution)
         segment_indices = self.convert_partition_to_segments(partition)
 
         current_segment_index = 0
-
-        for idx, seg in enumerate(segment_indices):
+        for seg in segment_indices:
             if max_sentences_per_segment is not None and len(seg) > max_sentences_per_segment:
                 sub_segments = [seg[i:i + max_sentences_per_segment] for i in range(0, len(seg), max_sentences_per_segment)]
                 
-                for sub_idx, sub_seg in enumerate(sub_segments):
+                for sub_seg in sub_segments:
                     self.segments.append(
                         Segment(current_segment_index, [(sent_idx, sentences[sent_idx]) for sent_idx in sorted(sub_seg)])
                     )
