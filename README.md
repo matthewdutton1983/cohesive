@@ -17,10 +17,12 @@ To start using cohesive, import Cohesive and the relevant text embedding class. 
 ```python
 from cohesive import Cohesive
 
-# By default, cohesive uses the paraphrase-MiniLM-L6-v2 model, which produces good results, but you can pass the name of any model into the Cohesive constructor.
+# By default, cohesive uses the paraphrase-MiniLM-L6-v2 model, which produces good
+# results, but you can pass the name of any model into the Cohesive constructor.
 cohesive = Cohesive("msmarco-distilbert-cos-v5")
 
-# Then, all you need to do is call the create_segments method and pass in an array of sentences.
+# Then, all you need to do is call the create_segments method and pass in an
+# array of sentences.
 cohesive.create_segments(sentences)
 ```
 
