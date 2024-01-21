@@ -1,1 +1,1 @@
-from cohesive.segmenter import Cohesive
+from cohesive.cohesive import Cohesive
