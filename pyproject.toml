@@ -2,7 +2,7 @@
 name = "cohesive"
 version = "0.1.5"
 description = "Use sentence embeddings to create naturally coherent segments of text akin to paragraphs."
-url = "https://github.com/matthewdutton1983/cohesive"
+repository = "https://github.com/matthewdutton1983/cohesive"
 readme = "README.md"
 authors = ["Matthew Dutton <matthewdutton1983@hotmail.co.uk>"]
 license = "Apache-2.0"
