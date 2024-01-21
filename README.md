@@ -12,7 +12,7 @@ pip install cohesive
 
 ## Using cohesive
 
-To start using cohesive, import Cohesive and the relevant text embedding class. Choose from OpenAI, SentenceTransformers, Tensorflow, or Transformers:
+To start using cohesive, simply import Cohesive and create a new instance of the client:
 
 ```python
 from cohesive import Cohesive
@@ -25,6 +25,8 @@ cohesive = Cohesive("msmarco-distilbert-cos-v5")
 # array of sentences.
 cohesive.create_segments(sentences)
 ```
+
+At the present time, cohesive is only compatible with the sentence-transformers library but additional encoders will be added in the future.
 
 ## Finetuning cohesive
 
