@@ -32,13 +32,13 @@ At the present time, cohesive is only compatible with the sentence-transformers 
 
 cohesive users can finetune several parameters, which all impact the final segmentation results in different ways. Here is a quick summary:
 
-- **window_size:** Sets the size of the context window for generating segments. Defaults to 4.
-- **louvain_resolution:** Used by the Louvain community detection algorithm to partition sentences into segments. Default is 1.
-- **framework:** The framework to use for calculating similarity scores. Choose between scipy and sklearn. Default is "scipy".
-- **show_progress_bar:** Flag to display the progress bar from sentence-transformers whilst generating embeddings. Defaults to False.
 - **balanced_window:** If True, the context window is split evenly between preceding and subsequent sentences, otherwise it only looks at subsequent sentences. Defaults to False.
 - **exponential_scaling:** Flag to use exponential scaling when calculating similarity scores. Defaults to False.
+- **framework:** The framework to use for calculating similarity scores. Choose between scipy and sklearn. Default is "scipy".
+- **louvain_resolution:** Used by the Louvain community detection algorithm to partition sentences into segments. Default is 1.
 - **max_sentences_per_segment:** Maximum number of sentences per segment. Default is None.
+- **show_progress_bar:** Flag to display the progress bar from sentence-transformers whilst generating embeddings. Defaults to False.
+- **window_size:** Sets the size of the context window for generating segments. Defaults to 4.
 
 To modify the parameters, simply pass in the appropriate parameter name and value when you call the create_segments method:
 
