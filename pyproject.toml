@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cohesive"
-version = "0.1.5"
+version = "0.1.6"
 description = "Use sentence embeddings to create naturally coherent segments of text akin to paragraphs."
 repository = "https://github.com/matthewdutton1983/cohesive"
 readme = "README.md"
